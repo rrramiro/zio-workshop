@@ -60,7 +60,7 @@ object functions {
    */
   def updateArray1[A](arr: Array[A], i: Int, f: A => A): Unit =
     arr.update(i, f(arr(i)))
-  def updateArray2[A]( /* ??? */ ): ??? = ???
+  def updateArray2[A]( /* ??? */ ): ???                       = ???
 
   /**
    * EXERCISE 7
@@ -75,27 +75,28 @@ object functions {
     def draw(): Unit
     def finish(): List[List[Boolean]]
   }
-  def draw1(size: Int): Draw = new Draw {
-    val canvas = Array.fill(size, size)(false)
-    var x      = 0
-    var y      = 0
+  def draw1(size: Int): Draw  =
+    new Draw {
+      val canvas = Array.fill(size, size)(false)
+      var x      = 0
+      var y      = 0
 
-    def goLeft(): Unit  = x -= 1
-    def goRight(): Unit = x += 1
-    def goUp(): Unit    = y += 1
-    def goDown(): Unit  = y -= 1
-    def draw(): Unit = {
-      def wrap(x: Int): Int =
-        if (x < 0) (size - 1) + ((x + 1) % size) else x % size
+      def goLeft(): Unit                = x -= 1
+      def goRight(): Unit               = x += 1
+      def goUp(): Unit                  = y += 1
+      def goDown(): Unit                = y -= 1
+      def draw(): Unit = {
+        def wrap(x: Int): Int =
+          if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
-      val x2 = wrap(x)
-      val y2 = wrap(y)
+        val x2                = wrap(x)
+        val y2                = wrap(y)
 
-      canvas.updated(x2, canvas(x2).updated(y2, true))
+        canvas.updated(x2, canvas(x2).updated(y2, true))
+      }
+      def finish(): List[List[Boolean]] =
+        canvas.map(_.toList).toList
     }
-    def finish(): List[List[Boolean]] =
-      canvas.map(_.toList).toList
-  }
   def draw2( /* ... */ ): ??? = ???
 
 }

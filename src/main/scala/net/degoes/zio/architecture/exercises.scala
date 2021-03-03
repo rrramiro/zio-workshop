@@ -3,21 +3,22 @@
 package net.degoes.zio.architecture
 
 import scala.util._
-
 import zio._
 import net.degoes.zio._
-import scala.compat.Platform
-import zio.internal.PlatformLive
 import zio.internal.Executor
+import zio.internal.Platform
 import scala.concurrent.ExecutionContext
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.Executors
 import zio.blocking.Blocking
+
 import java.sql.ResultSet
 import scala.concurrent.Await
 import java.util.concurrent.Future
 import java.io.FileOutputStream
 import java.io.File
+
+import scala.language.postfixOps
 
 object errors {
 
@@ -50,9 +51,10 @@ object errors {
   def repeatN(n: Int, action: () => Unit, accum: Boolean = true): Boolean =
     if (n <= 0) accum
     else {
-      val result = try {
-        action(); true
-      } catch { case _: Throwable => false }
+      val result =
+        try {
+          action(); true
+        } catch { case _: Throwable => false }
 
       repeatN(n - 1, action, accum && result)
     }
@@ -159,17 +161,20 @@ object errors {
   lazy val acceptConnection: Task[(Request, Response => Task[Unit])] = ??? // Assume implemented
   def launchServer(handler: Request => Task[Response]): UIO[Nothing] = {
     def loop: UIO[Nothing] =
-      acceptConnection.foldM(_ => loop, {
-        case (request, responder) =>
-          handler(request).foldM(
-            _ => loop,
-            response =>
-              responder(response).foldM(
-                _ => loop,
-                _ => loop
-              )
-          )
-      })
+      acceptConnection.foldM(
+        _ => loop,
+        {
+          case (request, responder) =>
+            handler(request).foldM(
+              _ => loop,
+              response =>
+                responder(response).foldM(
+                  _ => loop,
+                  _ => loop
+                )
+            )
+        }
+      )
 
     loop
   }
@@ -182,7 +187,7 @@ object threads {
    *
    * Count how many fibers are will be used in the following effect.
    */
-  val effect1 =
+  val effect1                =
     for {
       fiber1 <- fib(10).fork
       fiber2 <- fib(20).fork
@@ -196,14 +201,14 @@ object threads {
    * Create a `Platform` with a single threaded executor.
    */
   val singleThread           = ExecutionContext.fromExecutor(java.util.concurrent.Executors.newSingleThreadExecutor())
-  lazy val oneThreadPlatform = PlatformLive.fromExecutionContext(???)
+  lazy val oneThreadPlatform = Platform.fromExecutionContext(???)
 
   /**
    * EXERCISE 3
    *
    * Create a `Runtime` from the platform in Exercise 2.
    */
-  lazy val runtime = Runtime(new DefaultRuntime {}.Environment, ???)
+  lazy val runtime = Runtime(new BootstrapRuntime {}.environment, ???)
 
   /**
    * EXERCISEE 4
@@ -398,11 +403,10 @@ object dependencies {
    * Define a `UserStore` in terms of a `Database`.
    */
   lazy val userService: ZIO[Database, Nothing, UserStore] =
-    ZIO.accessM[Database](
-      env =>
-        UIO {
-          ???
-        }
+    ZIO.accessM[Database](env =>
+      UIO {
+        ???
+      }
     )
 
   /**
@@ -413,7 +417,7 @@ object dependencies {
   lazy val myProgram: ZIO[UserStore, Throwable, Unit] = ??? // Assume implemented
   lazy val eliminated: ZIO[Database, Throwable, Unit] = ???
 
-  trait Database {
+  trait Database  {
     val database: Database.Service
   }
   object Database {
@@ -422,7 +426,7 @@ object dependencies {
     }
   }
 
-  trait UserStore {
+  trait UserStore  {
     val userStore: UserStore.Service
   }
   object UserStore {

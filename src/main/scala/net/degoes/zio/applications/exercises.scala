@@ -4,7 +4,7 @@ package net.degoes.zio
 package applications
 
 import zio._
-import zio.blocking.Blocking
+import zio.blocking.{ effectBlocking, Blocking }
 import zio.console._
 import zio.duration.Duration
 import zio.random.Random
@@ -12,17 +12,16 @@ import zio.random.Random
 import java.io.IOException
 
 object sharding extends App {
+
   /**
-   * Create N workers reading from a Queue, if one of them fails, 
-   * then wait for the other ones to process the current item, but 
+   * Create N workers reading from a Queue, if one of them fails,
+   * then wait for the other ones to process the current item, but
    * terminate all the workers.
    */
   def shard[R, E, A](queue: Queue[A], n: Int, worker: A => ZIO[R, E, Unit]): ZIO[R, E, Nothing] = {
     val worker1 = queue.take.flatMap(a => worker(a).uninterruptible).forever
 
-    ZIO.forkAll(List.fill(n)(worker1)).flatMap(fiber =>
-      fiber.join
-    ) *> ZIO.never
+    ZIO.forkAll(List.fill(n)(worker1)).flatMap(fiber => fiber.join) *> ZIO.never
   }
 
   def run(args: List[String]) = ???
@@ -42,23 +41,24 @@ object alerting {
   def sendSystemEmail(to: Email, subject: String, body: String): UIO[Unit] = ???
 
   /**
-   * Use STM to alert an engineer when the number of hourly errors exceeds 
+   * Use STM to alert an engineer when the number of hourly errors exceeds
    * 100.
    */
-  def alertEngineer(metrics: Metrics, onDuty: TRef[Engineer]): UIO[Unit] = 
+  def alertEngineer(metrics: Metrics, onDuty: TRef[Engineer]): UIO[Unit] =
     ???
 }
 
 object parallel_web_crawler {
-  trait Web {
-    def web: Web.Service
-  }
+  type Web = Has[Web.Service[Any]]
+
   object Web {
-    trait Service {
-      def getURL(url: URL): IO[Exception, String]
+
+    trait Service[R] {
+      def getURL(url: URL): RIO[R, String]
     }
-    trait Live extends Web with Blocking {
-      val web = new Service {
+
+    object Service {
+      val live: Service[Blocking] = new Service[Blocking] {
 
         /**
          * EXERCISE 1
@@ -67,7 +67,7 @@ object parallel_web_crawler {
          * side-effect into a purely functional ZIO effect, using `refineOrDie` to narrow
          * the `Throwable` error to `Exceptiono`.
          */
-        def getURL(url: URL): IO[Exception, String] = {
+        def getURL(url: URL): RIO[Blocking, String] = {
           // def effectBlocking[A](sideEffect: => A): ZIO[Blocking, Throwable, A]
 
           def getURLImpl(url: URL): String =
@@ -127,10 +127,11 @@ object parallel_web_crawler {
 
     def url: String = parsed.toString
 
-    override def equals(a: Any): Boolean = a match {
-      case that: URL => this.url == that.url
-      case _         => false
-    }
+    override def equals(a: Any): Boolean =
+      a match {
+        case that: URL => this.url == that.url
+        case _         => false
+      }
 
     override def hashCode: Int = url.hashCode
   }
@@ -177,8 +178,8 @@ object parallel_web_crawler {
         About         -> """<html><body><a href="home.html">Home</a><a href="http://google.com">Google</a></body></html>"""
       )
 
-    val TestWeb = new Web {
-      val web = new Web.Service {
+    val TestWeb =
+      new Web.Service[AnyVal] {
 
         /**
          * EXERCISE 4
@@ -189,7 +190,6 @@ object parallel_web_crawler {
         def getURL(url: URL): IO[Exception, String] =
           ???
       }
-    }
 
     val TestRouter: URL => Set[URL] =
       url => if (url.parsed.apexDomain == Some("scalaz.org")) Set(url) else Set()
@@ -201,7 +201,7 @@ object parallel_web_crawler {
   def run(args: List[String]): ZIO[Console, Nothing, Int] =
     (for {
       _ <- putStrLn("Hello World!")
-    } yield ()).fold(_ => 1, _ => 0)
+    } yield ()).as(0) //.fold(_ => 1, _ => 0)
 }
 
 object circuit_breaker extends App {
@@ -249,5 +249,5 @@ object circuit_breaker extends App {
     }
   }
 
-  override def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = ???
+  override def run(args: List[String]): URIO[ZEnv, ExitCode] = ???
 }

@@ -7,10 +7,10 @@ import java.io.File
 import java.util.concurrent.{ Executors, TimeUnit }
 
 import zio._
-import zio.internal.PlatformLive
+import zio.internal.Platform
 
 import scala.io.Source
-import java.time.Clock
+import scala.language.postfixOps
 
 /**
  * `ZIO[R, E, A]` is an immutable data structure that models an effect, which
@@ -84,7 +84,7 @@ object zio_types {
   /**
    * EXERCISE 8
    *
-   * An effect that may fail with `Throwable` or succeed with a value of 
+   * An effect that may fail with `Throwable` or succeed with a value of
    * type `A`, and which requires an `R` environment.
    */
   type RIO[-R, +A] = ???
@@ -92,7 +92,7 @@ object zio_types {
   /**
    * EXERCISE 8
    *
-   * An effect that cannot fail, but may succeed with a value of 
+   * An effect that cannot fail, but may succeed with a value of
    * type `A`, and which requires an `R` environment.
    */
   type URIO[-R, +A] = ???
@@ -175,12 +175,16 @@ object zio_values {
    * Using the `ZIO.effectAsync` method, translate the `ScheduledExecutor` callback-
    * based API into a ZIO effect.
    */
-  val scheduledExecutor = Executors.newScheduledThreadPool(1)
+  val scheduledExecutor                                    = Executors.newScheduledThreadPool(1)
   def sleep(l: Long, u: TimeUnit): ZIO[Any, Nothing, Unit] =
     scheduledExecutor
-      .schedule(new Runnable {
-        def run(): Unit = ???
-      }, l, u) ?
+      .schedule(
+        new Runnable {
+          def run(): Unit = ???
+        },
+        l,
+        u
+      ) ?
 
   /**
    * EXERCISE 10
@@ -210,7 +214,7 @@ object zio_values {
    *  ZIO (such as `DefaultRuntime`) and call `unsafeRun`, or write your
    * pure main function inside `App`.
    */
-  object Example extends DefaultRuntime {
+  object Example extends BootstrapRuntime {
     val sayHelloIO: UIO[Unit] = putStrLn("Hello ZIO!")
 
     //run sayHelloIO using `unsafeRun`
@@ -219,7 +223,7 @@ object zio_values {
 
   /**
    * EXERCISE 13
-   * 
+   *
    * Write a simple hello world program.
    */
   object MyMain extends App {
@@ -263,8 +267,8 @@ object zio_operations {
    * Using `ZIO#flatMap`, check the integer produced by an effect, and if it
    * is even, return `attack`, but if it is odd, return `retreat`.
    */
-  val attack: UIO[Boolean]  = UIO.effectTotal(println("Attacking!")).const(true)
-  val retreat: UIO[Boolean] = UIO.effectTotal(println("Retreating!")).const(false)
+  val attack: UIO[Boolean]  = UIO.effectTotal(println("Attacking!")).as(true)
+  val retreat: UIO[Boolean] = UIO.effectTotal(println("Retreating!")).as(false)
   val action: UIO[Boolean]  = UIO(42) ?
 
   /**
@@ -299,7 +303,7 @@ object zio_operations {
    *
    * Translate this factorial function into its ZIO equivalent.
    */
-  def factorial(n: Int): Int =
+  def factorial(n: Int): Int        =
     if (n <= 1) 1
     else n * factorial(n - 1)
   def factorialIO(n: Int): UIO[Int] =
@@ -349,9 +353,8 @@ object zio_operations {
   val nameAsk: Task[String] =
     Task
       .effect(println("What is your name?"))
-      .flatMap(
-        _ =>
-          Task.effect(scala.io.StdIn.readLine()).flatMap(name => Task.effect(println(s"Hello, $name")).map(_ => name))
+      .flatMap(_ =>
+        Task.effect(scala.io.StdIn.readLine()).flatMap(name => Task.effect(println(s"Hello, $name")).map(_ => name))
       )
 
   /**
@@ -375,12 +378,12 @@ object zio_operations {
     val number = scala.util.Random.nextInt(5)
     println("Enter a number between 0 - 5: ")
     scala.util.Try(scala.io.StdIn.readLine().toInt).toOption match {
-      case None =>
+      case None                           =>
         println("You didn't enter an integer!")
         playGame1()
       case Some(guess) if guess == number =>
         println("You guessed right! The number was " + number)
-      case _ =>
+      case _                              =>
         println("You guessed wrong! The number was " + number)
     }
   }
@@ -419,7 +422,7 @@ object zio_failure {
    */
   def divide(n: Int, d: Int): IO[ArithmeticException, Int] =
     if (d == 0) IO.fail(new ArithmeticException("Cannot divide by 0")) else IO.succeed(n / d)
-  val recovered1: UIO[Option[Int]] = divide(100, 0) ?
+  val recovered1: UIO[Option[Int]]                         = divide(100, 0) ?
 
   /**
    * EXERCISE 4
@@ -471,7 +474,7 @@ object zio_failure {
     if (input == "") IO.fail(EmptyStringError)
     else IO.effect(input.toInt)
   }
-  val caughtSome = readNumber ?
+  val caughtSome            = readNumber ?
 
   /**
    * EXERCISE 10
@@ -484,7 +487,6 @@ object zio_failure {
    * EXERCISE 11
    *
    * Using `ZIO#sandbox`, recover from the defect `defect1`.
-   *
    */
   val caught1: UIO[Int] = defect1 ?
 
@@ -532,7 +534,7 @@ object impure_to_pure {
         else if (age < 80) println("You are a mature adult")
         else if (age < 100) println("You are elderly")
         else println("You are probably lying.")
-      case None =>
+      case None      =>
         println("That's not an age, try again")
 
         ageExplainer1()
@@ -549,19 +551,18 @@ object impure_to_pure {
   def decode1(read: () => Byte): Either[Byte, Int] = {
     val b = read()
     if (b < 0) Left(b)
-    else {
+    else
       Right(
         b.toInt +
           (read().toInt << 8) +
           (read().toInt << 16) +
           (read().toInt << 24)
       )
-    }
   }
   def decode2[E](read: IO[E, Byte]): IO[E, Either[Byte, Int]] = ???
 }
 
-object zio_interop extends DefaultRuntime {
+object zio_interop extends BootstrapRuntime {
 
   import scala.concurrent.ExecutionContext.global
   import scala.concurrent.Future
@@ -632,10 +633,10 @@ object zio_resources {
   class InputStream private (is: FileInputStream) {
     def read: IO[Exception, Option[Byte]] =
       IO.effectTotal(is.read).map(i => if (i < 0) None else Some(i.toByte))
-    def close: IO[Exception, Unit] =
+    def close: IO[Exception, Unit]        =
       IO.effectTotal(is.close())
   }
-  object InputStream {
+  object InputStream                              {
     def openFile(file: File): IO[Exception, InputStream] =
       IO.effectTotal(new InputStream(new FileInputStream(file)))
   }
@@ -662,10 +663,9 @@ object zio_resources {
     }
 
     def finallyPuzzler(): Unit =
-      try {
-        try throw new Error("e1")
-        finally throw new Error("e2")
-      } catch {
+      try try throw new Error("e1")
+      finally throw new Error("e2")
+      catch {
         case e: Error => println(e)
       }
   }
@@ -676,7 +676,7 @@ object zio_resources {
    * Rewrite the following procedural program to ZIO, using `IO.fail` and the
    * `ensuring` method.
    */
-  var i = 0
+  var i                 = 0
   def noChange1(): Unit =
     try {
       i += 1
@@ -691,7 +691,7 @@ object zio_resources {
    * Rewrite the following procedural program to ZIO, using `IO.fail` and the
    * `ensuring` method of the `IO` object.
    */
-  def tryCatch1(): Unit =
+  def tryCatch1(): Unit     =
     try throw new Exception("Uh oh")
     finally println("On the way out...")
   val tryCatch2: Task[Unit] = ???
@@ -745,7 +745,7 @@ object zio_resources {
   def readFileTCF2(file: File): Task[List[Byte]] = ???
 
   /**
-   *`Managed[E, A]` is a managed resource of type `A`, which may be used by
+   * `Managed[E, A]` is a managed resource of type `A`, which may be used by
    * invoking the `use` method of the resource. The resource will be automatically
    * acquired before the resource is used, and automatically released after the
    * resource is used.
@@ -906,7 +906,7 @@ object zio_environment {
      *
      * Implement a production version of the `Config` module.
      */
-    trait Live extends Config {
+    trait Live  extends Config {
       val config: ??? = ???
     }
     object Live extends Live
@@ -937,7 +937,7 @@ object zio_environment {
    * Give the `configProgram` its dependencies by supplying it with both `Config`
    * and `Console` modules, and determine the type of the resulting effect.
    */
-  val provided = configProgram.provide(???) : ZIO[Any, Nothing, Int]
+  val provided = configProgram.provide(???): ZIO[Any, Nothing, Int]
 
   /**
    * EXERCISE 17
@@ -946,7 +946,7 @@ object zio_environment {
    * effect that has a dependency on `Config`:
    */
   val ConfigRuntime: Runtime[Config with Console] =
-    Runtime(??? : Config with Console, PlatformLive.Default)
+    Runtime(??? : Config with Console, Platform.default)
 
   /**
    * EXERCISE 18
@@ -972,9 +972,7 @@ object zio_environment {
    *
    * Build a module for a `FileSystem`.
    */
-  trait FileSystem {
-    val filesystem: FileSystem.Service[Any]
-  }
+  type FileSystem = Has[FileSystem.Service[Console]]
 
   object FileSystem {
 
@@ -983,17 +981,18 @@ object zio_environment {
      *
      * Create a service defining the capabilities of a `FileSystem`.
      */
-    trait Service[R] {}
+    trait Service[R <: Console] {}
 
     /**
      * EXERCISE 22
      *
      * Create a production implementation of the `FileSystem` module.
      */
-    trait Live extends FileSystem with Console {
-      val filesystem: ??? = ???
+    object Service {
+      val live: Service[Console] = new Service[Console] {}
     }
-    object Live extends Live with Console.Live
+    val live: Layer[Nothing, FileSystem] =
+      ZLayer.succeed(Service.live)
   }
 
   /**
@@ -1001,7 +1000,7 @@ object zio_environment {
    *
    * Using `ZIO.accessM`, create helpers.
    */
-  object fs extends FileSystem.Service[FileSystem] {}
+  object fs extends FileSystem.Service[Console] {}
 
   /**
    * EXERCISE 24
@@ -1032,9 +1031,7 @@ object zio_environment {
    *
    * Implement a mock file system module.
    */
-  trait MockFileSystem extends FileSystem {
-    val filesystem = ???
-  }
+  trait MockFileSystem extends FileSystem.Service[Console] {}
 
   /**
    * EXERCISE 28
@@ -1042,7 +1039,7 @@ object zio_environment {
    * Using `ZIO#provide` with the mock file system module, and a default
    * runtime, execute `fileProgram`.
    */
-  lazy val fileProgramTest: ??? = new DefaultRuntime {}.unsafeRun {
+  lazy val fileProgramTest: ??? = new BootstrapRuntime {}.unsafeRun {
     fileProgram.provide(???)
   }
 }

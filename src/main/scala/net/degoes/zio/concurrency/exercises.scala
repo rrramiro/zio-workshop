@@ -13,6 +13,7 @@ import zio.stream._
 import net.degoes.zio._
 
 import scala.concurrent.duration.Duration
+import scala.language.postfixOps
 
 object zio_fibers {
 
@@ -78,7 +79,7 @@ object zio_fibers {
    * Using `Fiber#join`, join the main fiber to the fibers constructed below,
    * which yields the value of the (joinee) fiber to the main (joiner) fiber.
    */
-  val fiber1: IO[Nothing, Int]       = Fiber.succeed[Nothing, Int](1) ?
+  val fiber1: IO[Nothing, Int]       = Fiber.succeed[Int](1) ?
   val fiber2: IO[Int, Nothing]       = Fiber.fail[Int](1) ?
   val fiber3: IO[Exception, Nothing] = Fiber.fail[Exception](new Exception("error!")) ?
 
@@ -88,7 +89,7 @@ object zio_fibers {
    * Using `Fiber#await`, suspend the main (joiner) fibers to the below fibers,
    * until they have run their course and produce `Exit` values.
    */
-  val await1: UIO[Exit[Nothing, Int]]       = Fiber.succeed[Nothing, Int](1) ?
+  val await1: UIO[Exit[Nothing, Int]]       = Fiber.succeed[Int](1) ?
   val await2: UIO[Exit[Nothing, Nothing]]   = Fiber.fromEffect(IO.succeed("run forever").forever) ?
   val await3: UIO[Exit[Int, Nothing]]       = Fiber.fail[Int](1) ?
   val await4: UIO[Exit[Exception, Nothing]] = Fiber.fail[Exception](new Exception("error!")) ?
@@ -98,7 +99,7 @@ object zio_fibers {
    *
    * Using `Fiber#poll`, observe to see if the Fiber is done executing.
    */
-  val observe1: UIO[Exit[Nothing, Int]]       = Fiber.succeed[Nothing, Int](1) ?
+  val observe1: UIO[Exit[Nothing, Int]]       = Fiber.succeed[Int](1) ?
   val observe2: UIO[Exit[Nothing, Nothing]]   = Fiber.fromEffect(IO.succeed("run forever").forever) ?
   val observe3: UIO[Exit[Int, Nothing]]       = Fiber.fail[Int](1) ?
   val observe4: UIO[Exit[Exception, Nothing]] = Fiber.fail[Exception](new Exception("error!")) ?
@@ -414,11 +415,11 @@ object zio_promise {
    *
    * Build auto-refreshing cache using `Ref`and `Promise`.
    */
-  case class CacheState[V](schedule: Schedule[V, Any])
+  case class CacheState[V](schedule: Schedule[Any, V, Any])
   trait Cache[E, V] {
     def get: IO[E, V]
   }
-  def makeCache[E, V](getter: IO[E, V], refresh: Schedule[V, Any]): Cache[E, V] = ???
+  def makeCache[E, V](getter: IO[E, V], refresh: Schedule[Any, V, Any]): Cache[E, V] = ???
 }
 
 object zio_queue {
@@ -563,10 +564,10 @@ object zio_semaphore {
     for {
       semaphore <- Semaphore.make(1)
       p         <- Promise.make[Nothing, Unit]
-      action    = putStrLn("Acquired") *> p.succeed(())
-      _         <- semaphore.acquire
-      _         <- semaphore.withPermit(???).fork // Run in separate fiber
-      _         <- semaphore.release
+      action     = putStrLn("Acquired") *> p.succeed(())
+      //_         <- semaphore.acquire
+      _         <- semaphore.withPermits(1)(???).fork // Run in separate fiber
+      //_         <- semaphore.release
       msg       <- p.await
     } yield msg
 
@@ -579,13 +580,13 @@ object zio_semaphore {
   trait Request
   trait Response
   type Handler = Request => UIO[Response]
-  lazy val defaultHandler: Handler                   = ???
-  def startWebServer(handler: Handler): UIO[Nothing] =
+  lazy val defaultHandler: Handler                               = ???
+  def startWebServer(handler: Handler): UIO[Nothing]             =
     // Pretend this is implemented.
     ???
   def limitedHandler(limit: Int, handler: Handler): UIO[Handler] =
     ???
-  val webServer1k: UIO[Nothing] =
+  val webServer1k: UIO[Nothing]                                  =
     for {
       acceptor <- limitedHandler(1000, defaultHandler)
       value    <- startWebServer(acceptor)
@@ -718,7 +719,7 @@ object zio_schedule {
    *
    * Using `Schedule.recurs`, create a schedule that recurs 5 times.
    */
-  val fiveTimes: Schedule[Any, Int] = ???
+  val fiveTimes: Schedule[Any, Any, Int] = ???
 
   /**
    * EXERCISE 2
@@ -733,7 +734,7 @@ object zio_schedule {
    *
    * Using `Schedule.spaced`, create a schedule that recurs forever every 1 second.
    */
-  val everySecond: Schedule[Any, Int] = ???
+  val everySecond: Schedule[Any, Any, Int] = ???
 
   /**
    * EXERCISE 4
@@ -784,7 +785,7 @@ object zio_schedule {
    * Using `Schedule.exponential`, create an exponential schedule that starts
    * from 10 milliseconds.
    */
-  val exponentialSchedule: Schedule[Any, Duration] =
+  val exponentialSchedule: Schedule[Any, Any, Duration] =
     ???
 
   /**
@@ -808,7 +809,7 @@ object zio_schedule {
    * Using `Schedule.identity`, produce a schedule that recurs forever, without delay,
    * returning its inputs.
    */
-  def inputs[A]: Schedule[A, A] = ???
+  def inputs[A]: Schedule[Any, A, A] = ???
 
   /**
    * EXERCISE 13
@@ -816,7 +817,7 @@ object zio_schedule {
    * Using `Schedule#collect`, produce a schedule that recurs forever, collecting its
    * inputs into a list.
    */
-  def collectedInputs[A]: Schedule[A, List[A]] =
+  def collectedInputs[A]: Schedule[Any, A, List[A]] =
     Schedule.identity[A] ?
 
   /**
@@ -825,7 +826,7 @@ object zio_schedule {
    * Using  `*>` (`zipRight`), combine `fiveTimes` and `everySecond` but return
    * the output of `everySecond`.
    */
-  val fiveTimesEverySecondR: Schedule[Any, Int] = ???
+  val fiveTimesEverySecondR: Schedule[Any, Any, Int] = ???
 
   /**
    * EXERCISE 15
@@ -837,7 +838,7 @@ object zio_schedule {
    * the schedule.
    */
   import zio.random.Random
-  def mySchedule[A]: ZSchedule[Clock with Random, A, List[A]] =
+  def mySchedule[A]: Schedule[Clock with Random, A, List[A]] =
     ???
 }
 
@@ -937,7 +938,7 @@ object zio_stm {
 
     def unlock: STM[Nothing, Unit] = ???
   }
-  object Lock {
+  object Lock                      {
     def make: STM[Nothing, Lock] = TRef.make(false).map(r => new Lock(r))
   }
 
@@ -947,13 +948,13 @@ object zio_stm {
    * Using `ZIO#descriptor` and the `FiberId` inside the descriptor, implement
    * a "fiber reentrant" lock.
    */
-  class ReentrantLock(value: TRef[Option[(FiberId, Int)]]) {
+  class ReentrantLock(value: TRef[Option[(Fiber.Id, Int)]]) {
     def lock: UIO[Unit] = ???
 
     def unlock: UIO[Unit] = ???
   }
-  object ReentrantLock {
-    def make: UIO[ReentrantLock] = TRef.make(Option.empty[(FiberId, Int)]).map(r => new ReentrantLock(r)).commit
+  object ReentrantLock                                      {
+    def make: UIO[ReentrantLock] = TRef.make(Option.empty[(Fiber.Id, Int)]).map(r => new ReentrantLock(r)).commit
   }
 
   /**
@@ -988,7 +989,7 @@ object zio_stm {
 
     def modify[B](k: K, f: V => (B, V)): STM[Nothing, B] = ???
   }
-  object TMap {
+  object TMap              {
     def make[K, V](load: Int = 16): STM[Nothing, TMap[K, V]] = ???
   }
 }

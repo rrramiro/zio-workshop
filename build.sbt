@@ -1,24 +1,24 @@
-val ZIOVersion        = "1.0.0-RC16"
-val CatsEffectVersion = "2.0.0"
-val MonixVersion      = "3.0.0"
+val ZIOVersion        = "1.0.4-2"
+val CatsEffectVersion = "2.3.3"
+val MonixVersion      = "3.3.0"
 
 lazy val root = project
   .in(file("."))
   .settings(
     name := "zio-workshop",
     organization := "net.degoes",
-    scalaVersion := "2.12.8",
+    scalaVersion := "2.13.5",
     initialCommands in Compile in console :=
       """|import zio._
          |import zio.console._
          |import zio.duration._
-         |object replRTS extends DefaultRuntime {}
+         |object replRTS extends BootstrapRuntime {}
          |import replRTS._
-         |implicit class RunSyntax[R >: replRTS.Environment, E, A](io: ZIO[R, E, A]){ def unsafeRun: A = replRTS.unsafeRun(io) }
+         |implicit class RunSyntax[R >: ZEnv, E, A](io: ZIO[R, E, A]){ def unsafeRun: A = replRTS.unsafeRun(io) }
     """.stripMargin
   )
 
-addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
 addCommandAlias("fmt", "all scalafmtSbt scalafmt test:scalafmt")
 addCommandAlias("check", "all scalafmtSbtCheck scalafmtCheck test:scalafmtCheck")
 
@@ -29,9 +29,9 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-effect"  % CatsEffectVersion,
   "io.monix"      %% "monix"        % MonixVersion,
   // URL parsing
-  "io.lemonlabs"  %% "scala-uri"    % "1.4.1"
+  "io.lemonlabs"  %% "scala-uri"    % "3.0.0"
 )
-
+/*
 scalacOptions in Compile in console := Seq(
   "-Ypartial-unification",
   "-language:higherKinds",
@@ -63,3 +63,4 @@ scalacOptions in Compile in console := Seq(
   "-Ywarn-nullary-override",
   "-Ywarn-nullary-unit"
 )
+*/
